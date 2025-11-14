@@ -10,7 +10,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="XGBoost Traffic Prediction API")
-
+ 
 MODEL_PATH = "data/xgboost_model.pkl"
 model = None
 try:
