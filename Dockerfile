@@ -1,34 +1,37 @@
-# Use an official Python runtime as a parent image
-FROM python:3.11-slim
+# --- STAGE 1: The "LFS Fetcher" ---
+# We use a base image that has git and git-lfs
+# This stage will clone the repo and pull the LFS files
+FROM alpine/git:latest AS lfs-fetcher
 
-# 1. Install system dependencies, including git and git-lfs
-RUN apt-get update && apt-get install -y \
-    git \
-    git-lfs \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
+# Set the GitHub repo URL and branch
+ARG REPO_URL="https://github.com/PrajwalShetty-114/XG-Boost-Model.git"
+ARG BRANCH="master"
 
-# 2. Set the working directory in the container
-WORKDIR /app
+WORKDIR /repo
 
-# 3. Install Git LFS
-RUN git lfs install --skip-smudge
+# Clone the specific branch
+RUN git clone --branch ${BRANCH} ${REPO_URL} .
 
-# 4. Copy ONLY the Git and LFS tracking files first
-# This gives the container the "instructions" for LFS
-COPY .git ./.git
-COPY .gitattributes .
-
-# 5. Now, pull the LFS files (the .pkl, .keras, etc.)
-# This command will now work because the .git folder is present
+# Install LFS and pull the large files
+RUN git lfs install
 RUN git lfs pull
 
-# 6. Copy the rest of your application code
-# (main.py, requirements.txt, data/ folder, etc.)
-COPY . .
+# --- STAGE 2: The "Application" ---
+# Now we build the actual Python app
+FROM python:3.11-slim
 
-# 7. Install Python requirements
+WORKDIR /app
+
+# Install Python requirements first
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 8. Set the command to run the app using gunicorn
-# Render will automatically set the PORT environment variable
+# Copy the application files (including the LFS-pulled .pkl file)
+# from the first stage
+COPY --from=lfs-fetcher /repo/data/ /app/data/
+COPY --from=lfs-fetcher /repo/main.py .
+COPY --from=lfs-fetcher /repo/data/preprocessing.py /app/data/
+
+# Command to run the app
+# Render automatically provides the $PORT variable
 CMD ["gunicorn", "-w", "4", "-k", "uvicorn.workers.UvicornWorker", "main:app", "--bind", "0.0.0.0:$PORT"]
