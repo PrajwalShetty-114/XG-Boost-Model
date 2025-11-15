@@ -1,9 +1,0 @@
-# Don't ignore the Git files, we need them for LFS
-!**/.git
-!**/.gitattributes
-
-# Now, ignore the usual Python junk
-__pycache__/
-*.pyc
-.venv/
-.DS_Store
